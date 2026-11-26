@@ -10,7 +10,8 @@ let data = {
   },
   attendance: {},
   payments: [],
-  filter: { from: '', to: '' }
+  filter: { from: '', to: '' },
+  payFilter: { from: '', to: '' }
 };
 
 function load() {
@@ -20,7 +21,9 @@ function load() {
       data = {
         ...data,
         ...x,
-        settings: { ...data.settings, ...(x.settings || {}) }
+        settings: { ...data.settings, ...(x.settings || {}) },
+        filter: { ...data.filter, ...(x.filter || {}) },
+        payFilter: { ...data.payFilter, ...(x.payFilter || {}) }
       };
     }
   } catch (e) {
@@ -100,6 +103,22 @@ function workingDates(a, b) {
   return arr;
 }
 
+// Returns 0.5 CL if the internship starts between 21st July and 25th July, otherwise 1 CL
+function monthlyClAccrual(year, monthIndex) {
+  if (!data.settings.start) return 1;
+  const start = dateObj(data.settings.start);
+  if (
+    start.getFullYear() === year &&
+    start.getMonth() === monthIndex &&
+    monthIndex === 6 && // July (0-indexed: Jan=0 ... Jul=6)
+    start.getDate() >= 21 &&
+    start.getDate() <= 25
+  ) {
+    return 0.5;
+  }
+  return 1;
+}
+
 function clEarned(asOf) {
   if (!data.settings.start) return 0;
   const start = dateObj(data.settings.start);
@@ -109,7 +128,7 @@ function clEarned(asOf) {
   const cur = new Date(start.getFullYear(), start.getMonth(), 1);
   const last = new Date(end.getFullYear(), end.getMonth(), 1);
   while (cur <= last) {
-    n++;
+    n += monthlyClAccrual(cur.getFullYear(), cur.getMonth());
     cur.setMonth(cur.getMonth() + 1);
   }
   return n;
@@ -133,9 +152,11 @@ function calc() {
   days.forEach((dt) => {
     const month = dt.slice(0, 7);
     if (month !== lastMonth) {
-      balance++;
+      const dObj = dateObj(dt);
+      balance += monthlyClAccrual(dObj.getFullYear(), dObj.getMonth());
       lastMonth = month;
     }
+
     const r = data.attendance[dt] || {
       status: 'Unmarked',
       leaveType: '',
@@ -152,10 +173,16 @@ function calc() {
       leave++;
       if (r.permission === 'No') {
         penalty = 5;
-      } else if (balance > 0) {
-        balance--;
+      } else if (balance >= 1) {
+        balance -= 1;
         clUsed = 1;
-        used++;
+        used += 1;
+      } else if (balance > 0) {
+        // Uses remaining 0.5 CL, and the uncovered 0.5 becomes LOP
+        clUsed = balance;
+        used += balance;
+        penalty = 1 - balance;
+        balance = 0;
       } else {
         penalty = 1;
       }
@@ -175,7 +202,8 @@ function targetDate(extra) {
   let count = 0;
   const d = dateObj(start);
   let limit = 0;
-  while (count < target + extra && limit < 3000) {
+  const totalNeeded = Math.ceil(target + extra);
+  while (count < totalNeeded && limit < 3000) {
     const st = iso(d);
     if (isWork(st)) {
       count++;
@@ -196,6 +224,10 @@ function render() {
   $('startDate').value = data.settings.start;
   $('targetDays').value = data.settings.target;
   $('asOf').value = data.settings.asOf;
+  $('filterFrom').value = data.filter.from;
+  $('filterTo').value = data.filter.to;
+  $('payFilterFrom').value = data.payFilter.from;
+  $('payFilterTo').value = data.payFilter.to;
 
   if (!c) {
     ['sWorking', 'sAttended', 'sLeave', 'sCL', 'sPenalty', 'sEarn', 'sTarget', 'sExtended'].forEach(
@@ -257,7 +289,7 @@ function render() {
               <option ${r.exam === 'Yes' ? 'selected' : ''}>Yes</option>
             </select>
           </td>
-          <td><span class="pill ${clUsed ? 'warn' : ''}">${clUsed ? '1 day' : '—'}</span></td>
+          <td><span class="pill ${clUsed ? 'warn' : ''}">${clUsed ? clUsed + ' day' : '—'}</span></td>
           <td><span class="pill ${penalty ? 'bad' : 'ok'}">${penalty ? '×' + penalty : '—'}</span></td>
           <td><input class="tiny" data-k="remarks" value="${(r.remarks || '').replaceAll('"', '&quot;')}" placeholder="Remarks"></td>
         </tr>`
@@ -288,9 +320,29 @@ function render() {
 }
 
 function renderPayments() {
+  const pFrom = data.payFilter.from;
+  const pTo = data.payFilter.to;
+
+  // Keep original index so delete works accurately even when filtered
+  const indexedPayments = data.payments
+    .map((p, idx) => ({ ...p, idx }))
+    .filter((p) => (!pFrom || p.date >= pFrom) && (!pTo || p.date <= pTo));
+
+  const filteredTotal = indexedPayments.reduce((a, p) => a + Number(p.amount || 0), 0);
+
+  if (pFrom || pTo) {
+    $('payInfo').textContent = `Filtered total (${pFrom ? fmt(pFrom) : 'Start'} to ${
+      pTo ? fmt(pTo) : 'Latest'
+    }): ${currency(filteredTotal)} across ${indexedPayments.length} credit(s).`;
+  } else {
+    $('payInfo').textContent = `Showing all ${indexedPayments.length} salary credit(s). Total: ${currency(
+      filteredTotal
+    )}.`;
+  }
+
   $('payRows').innerHTML =
-    data.payments
-      .map((p, i) => {
+    indexedPayments
+      .map((p) => {
         const cyc = cycleFor(p.date);
         const n = workingDates(cyc.start, cyc.end).length;
         return `<tr>
@@ -298,10 +350,10 @@ function renderPayments() {
           <td>${cyc.label}</td>
           <td>${currency(p.amount)}</td>
           <td>${currency(n ? Number(p.amount) / n : 0)} <small>(${n} days)</small></td>
-          <td><button class="danger" data-del="${i}">Delete</button></td>
+          <td><button class="danger" data-del="${p.idx}">Delete</button></td>
         </tr>`;
       })
-      .join('') || '<tr><td colspan="5">No salary credits entered.</td></tr>';
+      .join('') || '<tr><td colspan="5">No salary credits in this date range.</td></tr>';
 
   $('payRows')
     .querySelectorAll('[data-del]')
@@ -363,6 +415,20 @@ $('addPay').onclick = () => {
   $('payDate').value = '';
   $('payAmount').value = '';
   $('payNote').value = '';
+  render();
+};
+
+$('applyPayFilter').onclick = () => {
+  data.payFilter = { from: $('payFilterFrom').value, to: $('payFilterTo').value };
+  save();
+  render();
+};
+
+$('clearPayFilter').onclick = () => {
+  data.payFilter = { from: '', to: '' };
+  $('payFilterFrom').value = '';
+  $('payFilterTo').value = '';
+  save();
   render();
 };
 
@@ -442,7 +508,12 @@ $('restoreFile').onchange = (e) => {
     try {
       const parsed = JSON.parse(ev.target.result);
       if (parsed && parsed.settings) {
-        data = parsed;
+        data = {
+          ...data,
+          ...parsed,
+          filter: parsed.filter || { from: '', to: '' },
+          payFilter: parsed.payFilter || { from: '', to: '' }
+        };
         save();
         render();
         alert('Data restored successfully!');
@@ -463,7 +534,8 @@ $('reset').onclick = () => {
       settings: { name: '', start: '', target: 300, asOf: new Date().toISOString().slice(0, 10) },
       attendance: {},
       payments: [],
-      filter: { from: '', to: '' }
+      filter: { from: '', to: '' },
+      payFilter: { from: '', to: '' }
     };
     render();
   }
