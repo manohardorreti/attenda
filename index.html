@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Intern Attendance & Salary Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Intern Attendance & Salary Dashboard</h1>
+    <p>Attendance • CL / LOP tracking • Salary cycles • 300-day internship progress</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="row">
+        <div>
+          <label for="internName">Intern name</label>
+          <input id="internName" placeholder="Enter intern name">
+        </div>
+        <div>
+          <label for="startDate">Internship start date</label>
+          <input id="startDate" type="date">
+        </div>
+        <div>
+          <label for="targetDays">Internship target (working days)</label>
+          <input id="targetDays" type="number" min="1" value="300">
+        </div>
+        <div>
+          <label for="asOf">Today / calculate through</label>
+          <input id="asOf" type="date">
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="saveSettings">Save details</button>
+        <button class="secondary" id="generate">Generate / refresh attendance</button>
+        <button class="secondary" id="export">Export attendance CSV</button>
+        <button class="secondary" id="backupJson">Backup JSON</button>
+        <button class="secondary" id="restoreBtn">Restore JSON</button>
+        <input type="file" id="restoreFile" accept=".json" class="hidden">
+        <button class="danger" id="reset">Reset all data</button>
+      </div>
+
+      <div class="note">
+        Rules applied: Monday–Saturday are working days; the 2nd Saturday of each month is a holiday. Salary periods run from the 26th of the previous month through the 25th. CL accrues at 1 day per calendar month and unused CL carries forward.
+      </div>
+    </section>
+
+    <section class="grid stats" id="stats">
+      <div class="card stat"><small>Total scheduled working days</small><strong id="sWorking">—</strong><em>From start date to selected date</em></div>
+      <div class="card stat"><small>Attended days</small><strong id="sAttended">—</strong><em>Marked present</em></div>
+      <div class="card stat"><small>Leave days</small><strong id="sLeave">—</strong><em>All leave categories</em></div>
+      <div class="card stat"><small>CL balance</small><strong id="sCL">—</strong><em>Earned less CL used</em></div>
+      <div class="card stat"><small>LOP penalty days</small><strong id="sPenalty">—</strong><em>LOP × 1 or × 5</em></div>
+      <div class="card stat"><small>Total salary credited</small><strong id="sEarn">—</strong><em>Sum of entered credits</em></div>
+      <div class="card stat"><small>300 working days target</small><strong id="sTarget">—</strong><em>Projected date, before penalties</em></div>
+      <div class="card stat"><small>Target incl. LOP extensions</small><strong id="sExtended">—</strong><em>Projected date after extra days</em></div>
+    </section>
+
+    <section class="grid two">
+      <div class="card">
+        <h2>Salary credit entry</h2>
+        <p class="sub">Record the actual credit date and amount. Daily earning = credited salary ÷ scheduled working days in that salary cycle.</p>
+        <div class="row">
+          <div>
+            <label for="payDate">Credit date</label>
+            <input id="payDate" type="date">
+          </div>
+          <div>
+            <label for="payAmount">Amount credited (₹)</label>
+            <input id="payAmount" type="number" min="0" step=".01" placeholder="e.g. 15000">
+          </div>
+        </div>
+        <label for="payNote">Notes (optional)</label>
+        <input id="payNote" placeholder="Salary for cycle / remarks">
+        <div class="actions">
+          <button id="addPay">Add salary credit</button>
+        </div>
+        <div id="payInfo" class="note">Enter a credit date and amount to calculate the cycle's per-day earning.</div>
+        <div class="tablewrap" style="margin-top:12px">
+          <table style="min-width:500px">
+            <thead>
+              <tr>
+                <th>Credit date</th>
+                <th>Cycle</th>
+                <th>Amount</th>
+                <th>Per working day</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="payRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Attendance date filter</h2>
+        <p class="sub">Filter the attendance list by any date range. The dashboard summary remains based on the internship start date through the selected calculation date.</p>
+        <div class="row">
+          <div>
+            <label for="filterFrom">From</label>
+            <input id="filterFrom" type="date">
+          </div>
+          <div>
+            <label for="filterTo">To</label>
+            <input id="filterTo" type="date">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="secondary" id="applyFilter">Apply date range</button>
+          <button class="secondary" id="clearFilter">Clear filter</button>
+        </div>
+        <div class="note">For each working day, edit the status, leave type, prior permission, and college exam notice. The system recalculates CL usage and LOP automatically.</div>
+
+        <h2 style="margin-top:18px">Company rules</h2>
+        <ul class="rules-list">
+          <li>2nd Saturday is a holiday; Sundays are non-working.</li>
+          <li>Approved leave uses available CL first. Any excess approved leave becomes LOP × 1.</li>
+          <li>Leave without prior intimation becomes LOP × 5.</li>
+          <li>Each LOP penalty adds 1 or 5 extra working days to the internship target.</li>
+          <li>College exam leave/absence must have prior information recorded.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h2>Attendance register</h2>
+          <p class="sub">Edit any row. Changes are saved automatically on this device.</p>
+        </div>
+        <div>
+          <span class="pill">P = Present</span>
+          <span class="pill warn">CL = Casual leave</span>
+          <span class="pill bad">LOP = Loss of pay</span>
+        </div>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Day</th>
+              <th>Status</th>
+              <th>Leave type</th>
+              <th>Prior permission?</th>
+              <th>College exam notice?</th>
+              <th>CL used</th>
+              <th>LOP penalty</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="attendanceRows"></tbody>
+        </table>
+      </div>
+      <footer>
+        Public holidays other than Sundays and 2nd Saturdays are not automatically included. Add/mark those according to your company's holiday calendar.
+      </footer>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
