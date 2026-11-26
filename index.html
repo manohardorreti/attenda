@@ -44,7 +44,7 @@
       </div>
 
       <div class="note">
-        Rules applied: Monday–Saturday are working days; the 2nd Saturday of each month is a holiday. Salary periods run from the 26th of the previous month through the 25th. CL accrues at 1 day per calendar month and unused CL carries forward.
+        Rules applied: Monday–Saturday are working days; the 2nd Saturday of each month is a holiday. Salary periods run from the 26th of the previous month through the 25th. CL accrues at 1 day per calendar month (0.5 CL if joining between 21st–25th July) and unused CL carries forward.
       </div>
     </section>
 
@@ -78,7 +78,25 @@
         <div class="actions">
           <button id="addPay">Add salary credit</button>
         </div>
-        <div id="payInfo" class="note">Enter a credit date and amount to calculate the cycle's per-day earning.</div>
+
+        <hr style="border:0;border-top:1px solid var(--line);margin:16px 0 12px">
+        <h3 style="font-size:14px;margin:0 0 6px">Filter salary credits</h3>
+        <div class="row">
+          <div>
+            <label for="payFilterFrom">From</label>
+            <input id="payFilterFrom" type="date">
+          </div>
+          <div>
+            <label for="payFilterTo">To</label>
+            <input id="payFilterTo" type="date">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="secondary" id="applyPayFilter">Apply salary filter</button>
+          <button class="secondary" id="clearPayFilter">Clear filter</button>
+        </div>
+
+        <div id="payInfo" class="note">Showing all salary credits.</div>
         <div class="tablewrap" style="margin-top:12px">
           <table style="min-width:500px">
             <thead>
@@ -117,7 +135,8 @@
         <h2 style="margin-top:18px">Company rules</h2>
         <ul class="rules-list">
           <li>2nd Saturday is a holiday; Sundays are non-working.</li>
-          <li>Approved leave uses available CL first. Any excess approved leave becomes LOP × 1.</li>
+          <li>Joining between 21st July and 25th July grants <strong>0.5 CL</strong> for July; all other months accrue 1 CL.</li>
+          <li>Approved leave uses available CL first (including 0.5 CL if available, with the remaining 0.5 becoming LOP). Any excess approved leave becomes LOP × 1.</li>
           <li>Leave without prior intimation becomes LOP × 5.</li>
           <li>Each LOP penalty adds 1 or 5 extra working days to the internship target.</li>
           <li>College exam leave/absence must have prior information recorded.</li>
