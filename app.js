@@ -10,8 +10,7 @@ let data = {
   },
   attendance: {},
   payments: [],
-  filter: { from: '', to: '' },
-  payFilter: { from: '', to: '' }
+  filter: { from: '', to: '' }
 };
 
 function load() {
@@ -22,8 +21,7 @@ function load() {
         ...data,
         ...x,
         settings: { ...data.settings, ...(x.settings || {}) },
-        filter: { ...data.filter, ...(x.filter || {}) },
-        payFilter: { ...data.payFilter, ...(x.payFilter || {}) }
+        filter: { ...data.filter, ...(x.filter || {}) }
       };
     }
   } catch (e) {
@@ -64,26 +62,18 @@ function isWork(s) {
   return d.getDay() !== 0 && !(d.getDay() === 6 && Math.ceil(d.getDate() / 7) === 2);
 }
 
-function cycleFor(s) {
+function defaultCycleFor(s) {
   const d = dateObj(s);
   const y = d.getFullYear();
   const m = d.getMonth();
   if (d.getDate() <= 25) {
     const prev = new Date(y, m - 1, 26);
     const end = new Date(y, m, 25);
-    return {
-      start: iso(prev),
-      end: iso(end),
-      label: fmt(iso(prev)) + ' – ' + fmt(iso(end))
-    };
+    return { start: iso(prev), end: iso(end) };
   }
   const st = new Date(y, m, 26);
   const en = new Date(y, m + 1, 25);
-  return {
-    start: iso(st),
-    end: iso(en),
-    label: fmt(iso(st)) + ' – ' + fmt(iso(en))
-  };
+  return { start: iso(st), end: iso(en) };
 }
 
 function eachDate(a, b, fn) {
@@ -103,14 +93,14 @@ function workingDates(a, b) {
   return arr;
 }
 
-// Returns 0.5 CL if the internship starts between 21st July and 25th July, otherwise 1 CL
+// Grants 0.5 CL if internship start date is between 21st July and 25th July, else 1 CL
 function monthlyClAccrual(year, monthIndex) {
   if (!data.settings.start) return 1;
   const start = dateObj(data.settings.start);
   if (
     start.getFullYear() === year &&
     start.getMonth() === monthIndex &&
-    monthIndex === 6 && // July (0-indexed: Jan=0 ... Jul=6)
+    monthIndex === 6 && // July (0-indexed)
     start.getDate() >= 21 &&
     start.getDate() <= 25
   ) {
@@ -178,7 +168,6 @@ function calc() {
         clUsed = 1;
         used += 1;
       } else if (balance > 0) {
-        // Uses remaining 0.5 CL, and the uncovered 0.5 becomes LOP
         clUsed = balance;
         used += balance;
         penalty = 1 - balance;
@@ -218,6 +207,32 @@ function currency(n) {
   return '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 }
 
+function updatePayPreview() {
+  const from = $('payFrom').value;
+  const to = $('payTo').value;
+  const amount = Number($('payAmount').value);
+
+  if (from && to) {
+    if (to < from) {
+      $('payInfo').textContent = 'Warning: "Duration To" cannot be earlier than "Duration From".';
+      return;
+    }
+    const n = workingDates(from, to).length;
+    if (Number.isFinite(amount) && amount > 0) {
+      $('payInfo').textContent = `Duration: ${fmt(from)} – ${fmt(to)} (${n} working day${
+        n === 1 ? '' : 's'
+      }) → ${currency(n ? amount / n : 0)} per working day.`;
+    } else {
+      $('payInfo').textContent = `Duration: ${fmt(from)} – ${fmt(to)} (${n} working day${
+        n === 1 ? '' : 's'
+      }). Enter amount to see per-day earning.`;
+    }
+  } else {
+    $('payInfo').textContent =
+      'Select a credit date (auto-fills standard cycle) or set custom From/To dates and amount.';
+  }
+}
+
 function render() {
   const c = calc();
   $('internName').value = data.settings.name;
@@ -226,8 +241,6 @@ function render() {
   $('asOf').value = data.settings.asOf;
   $('filterFrom').value = data.filter.from;
   $('filterTo').value = data.filter.to;
-  $('payFilterFrom').value = data.payFilter.from;
-  $('payFilterTo').value = data.payFilter.to;
 
   if (!c) {
     ['sWorking', 'sAttended', 'sLeave', 'sCL', 'sPenalty', 'sEarn', 'sTarget', 'sExtended'].forEach(
@@ -320,40 +333,24 @@ function render() {
 }
 
 function renderPayments() {
-  const pFrom = data.payFilter.from;
-  const pTo = data.payFilter.to;
-
-  // Keep original index so delete works accurately even when filtered
-  const indexedPayments = data.payments
-    .map((p, idx) => ({ ...p, idx }))
-    .filter((p) => (!pFrom || p.date >= pFrom) && (!pTo || p.date <= pTo));
-
-  const filteredTotal = indexedPayments.reduce((a, p) => a + Number(p.amount || 0), 0);
-
-  if (pFrom || pTo) {
-    $('payInfo').textContent = `Filtered total (${pFrom ? fmt(pFrom) : 'Start'} to ${
-      pTo ? fmt(pTo) : 'Latest'
-    }): ${currency(filteredTotal)} across ${indexedPayments.length} credit(s).`;
-  } else {
-    $('payInfo').textContent = `Showing all ${indexedPayments.length} salary credit(s). Total: ${currency(
-      filteredTotal
-    )}.`;
-  }
-
   $('payRows').innerHTML =
-    indexedPayments
-      .map((p) => {
-        const cyc = cycleFor(p.date);
-        const n = workingDates(cyc.start, cyc.end).length;
+    data.payments
+      .map((p, i) => {
+        // Use saved custom duration (from/to) if present, else fallback to default cycle
+        const fallback = defaultCycleFor(p.date);
+        const start = p.from || fallback.start;
+        const end = p.to || fallback.end;
+        const n = workingDates(start, end).length;
         return `<tr>
           <td>${fmt(p.date)}</td>
-          <td>${cyc.label}</td>
+          <td>${fmt(start)} – ${fmt(end)}</td>
           <td>${currency(p.amount)}</td>
           <td>${currency(n ? Number(p.amount) / n : 0)} <small>(${n} days)</small></td>
-          <td><button class="danger" data-del="${p.idx}">Delete</button></td>
+          <td><small>${(p.note || '').replaceAll('<', '&lt;')}</small></td>
+          <td><button class="danger" data-del="${i}">Delete</button></td>
         </tr>`;
       })
-      .join('') || '<tr><td colspan="5">No salary credits in this date range.</td></tr>';
+      .join('') || '<tr><td colspan="6">No salary credits entered.</td></tr>';
 
   $('payRows')
     .querySelectorAll('[data-del]')
@@ -367,7 +364,54 @@ function renderPayments() {
     );
 }
 
-// Event Listeners
+// Auto-populate default 26th–25th cycle when Credit Date changes (still editable)
+$('payDate').addEventListener('change', () => {
+  const val = $('payDate').value;
+  if (val) {
+    const cyc = defaultCycleFor(val);
+    $('payFrom').value = cyc.start;
+    $('payTo').value = cyc.end;
+  }
+  updatePayPreview();
+});
+
+$('payFrom').addEventListener('change', updatePayPreview);
+$('payTo').addEventListener('change', updatePayPreview);
+$('payAmount').addEventListener('input', updatePayPreview);
+
+$('addPay').onclick = () => {
+  const date = $('payDate').value;
+  const from = $('payFrom').value;
+  const to = $('payTo').value;
+  const amount = Number($('payAmount').value);
+
+  if (!date || !from || !to || !Number.isFinite(amount) || amount < 0) {
+    alert('Enter a valid credit date, Duration From, Duration To, and amount.');
+    return;
+  }
+  if (to < from) {
+    alert('"Duration To" cannot be earlier than "Duration From".');
+    return;
+  }
+
+  data.payments.push({
+    date,
+    from,
+    to,
+    amount,
+    note: $('payNote').value
+  });
+  save();
+
+  $('payDate').value = '';
+  $('payFrom').value = '';
+  $('payTo').value = '';
+  $('payAmount').value = '';
+  $('payNote').value = '';
+  updatePayPreview();
+  render();
+};
+
 $('saveSettings').onclick = () => {
   data.settings = {
     name: $('internName').value,
@@ -399,35 +443,6 @@ $('generate').onclick = () => {
       }
     });
   }
-  save();
-  render();
-};
-
-$('addPay').onclick = () => {
-  const date = $('payDate').value;
-  const amount = Number($('payAmount').value);
-  if (!date || !Number.isFinite(amount) || amount < 0) {
-    alert('Enter a valid credit date and amount.');
-    return;
-  }
-  data.payments.push({ date, amount, note: $('payNote').value });
-  save();
-  $('payDate').value = '';
-  $('payAmount').value = '';
-  $('payNote').value = '';
-  render();
-};
-
-$('applyPayFilter').onclick = () => {
-  data.payFilter = { from: $('payFilterFrom').value, to: $('payFilterTo').value };
-  save();
-  render();
-};
-
-$('clearPayFilter').onclick = () => {
-  data.payFilter = { from: '', to: '' };
-  $('payFilterFrom').value = '';
-  $('payFilterTo').value = '';
   save();
   render();
 };
@@ -511,8 +526,7 @@ $('restoreFile').onchange = (e) => {
         data = {
           ...data,
           ...parsed,
-          filter: parsed.filter || { from: '', to: '' },
-          payFilter: parsed.payFilter || { from: '', to: '' }
+          filter: parsed.filter || { from: '', to: '' }
         };
         save();
         render();
@@ -534,8 +548,7 @@ $('reset').onclick = () => {
       settings: { name: '', start: '', target: 300, asOf: new Date().toISOString().slice(0, 10) },
       attendance: {},
       payments: [],
-      filter: { from: '', to: '' },
-      payFilter: { from: '', to: '' }
+      filter: { from: '', to: '' }
     };
     render();
   }
