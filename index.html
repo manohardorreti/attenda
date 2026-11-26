@@ -44,7 +44,7 @@
       </div>
 
       <div class="note">
-        Rules applied: Monday–Saturday are working days; the 2nd Saturday of each month is a holiday. Salary periods run from the 26th of the previous month through the 25th. CL accrues at 1 day per calendar month (0.5 CL if joining between 21st–25th July) and unused CL carries forward.
+        Rules applied: Monday–Saturday are working days; the 2nd Saturday of each month is a holiday. Standard salary periods run from the 26th of the previous month through the 25th (editable per entry). CL accrues at 1 day per calendar month (0.5 CL if joining between 21st–25th July) and unused CL carries forward.
       </div>
     </section>
 
@@ -62,7 +62,8 @@
     <section class="grid two">
       <div class="card">
         <h2>Salary credit entry</h2>
-        <p class="sub">Record the actual credit date and amount. Daily earning = credited salary ÷ scheduled working days in that salary cycle.</p>
+        <p class="sub">Enter the credit date, the exact salary duration (From – To), and amount. Daily earning = credited salary ÷ scheduled working days in that duration.</p>
+        
         <div class="row">
           <div>
             <label for="payDate">Credit date</label>
@@ -70,41 +71,39 @@
           </div>
           <div>
             <label for="payAmount">Amount credited (₹)</label>
-            <input id="payAmount" type="number" min="0" step=".01" placeholder="e.g. 15000">
+            <input id="payAmount" type="number" min="0" step=".01" placeholder="e.g. 3484">
           </div>
         </div>
+
+        <div class="row">
+          <div>
+            <label for="payFrom">Duration From</label>
+            <input id="payFrom" type="date">
+          </div>
+          <div>
+            <label for="payTo">Duration To</label>
+            <input id="payTo" type="date">
+          </div>
+        </div>
+
         <label for="payNote">Notes (optional)</label>
-        <input id="payNote" placeholder="Salary for cycle / remarks">
+        <input id="payNote" placeholder="e.g. July pro-rated salary (21st–25th)">
+        
         <div class="actions">
           <button id="addPay">Add salary credit</button>
         </div>
 
-        <hr style="border:0;border-top:1px solid var(--line);margin:16px 0 12px">
-        <h3 style="font-size:14px;margin:0 0 6px">Filter salary credits</h3>
-        <div class="row">
-          <div>
-            <label for="payFilterFrom">From</label>
-            <input id="payFilterFrom" type="date">
-          </div>
-          <div>
-            <label for="payFilterTo">To</label>
-            <input id="payFilterTo" type="date">
-          </div>
-        </div>
-        <div class="actions">
-          <button class="secondary" id="applyPayFilter">Apply salary filter</button>
-          <button class="secondary" id="clearPayFilter">Clear filter</button>
-        </div>
+        <div id="payInfo" class="note">Select a credit date (auto-fills standard cycle) or set custom From/To dates and amount.</div>
 
-        <div id="payInfo" class="note">Showing all salary credits.</div>
         <div class="tablewrap" style="margin-top:12px">
-          <table style="min-width:500px">
+          <table style="min-width:540px">
             <thead>
               <tr>
                 <th>Credit date</th>
-                <th>Cycle</th>
+                <th>Duration (From – To)</th>
                 <th>Amount</th>
                 <th>Per working day</th>
+                <th>Notes</th>
                 <th></th>
               </tr>
             </thead>
